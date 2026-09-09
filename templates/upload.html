@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Weekly Report Generator</title><link rel="stylesheet" href="{{ url_for('static',filename='report.css') }}"></head>
+<body><main class="upload">
+<h1>Weekly Report Generator</h1>
+<p class="muted">Choose this week's Excel workbook to create a complete HTML management report.</p>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+{% if result %}
+<h2 class="success">Report generated successfully</h2>
+<p>{{ result.name }}</p>
+<div class="actions-row"><a class="button primary" href="{{ url_for('report',token=result.token,name=result.name) }}" target="_blank" rel="noopener">Open Report</a><a class="button" href="{{ url_for('report',token=result.token,name=result.name,download='1') }}">Download HTML</a></div>
+<p class="scope">Routine inconsistencies were handled automatically using the available Excel data. Missing values remain labelled; source notes are included in the report.</p>
+<hr style="border:0;border-top:1px solid #dde2e5;margin:26px 0">
+{% endif %}
+<form class="upload-form" action="{{ url_for('generate') }}" method="post" enctype="multipart/form-data">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<label for="workbook"><strong>Weekly Excel workbook</strong><br><small>.xlsx files Â· up to {{ max_mb }} MB</small></label>
+<input id="workbook" name="workbook" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+<button class="primary" type="submit">Generate HTML Report</button>
+</form>
+<p class="scope">Processing stays on this computer. The generated HTML includes its charts and styling and opens without a server or internet connection.</p>
+<script>document.querySelector('form').addEventListener('submit',function(){const button=this.querySelector('button');button.disabled=true;button.textContent='Generating reportâ€¦';});</script>
+</main></body></html>

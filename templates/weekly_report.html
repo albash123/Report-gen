@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ meta.title }} — {{ meta.report_period_label }} — {{ meta.company }}</title>
+<style>{{ css|safe }}</style>
+</head>
+<body>
+<main>
+<div class="toolbar no-print"><button id="expand-tasks" type="button">Expand task log</button><button id="print-report" type="button">Print / Save as PDF</button></div>
+<header>
+  <div class="company">{{ meta.company }}</div>
+  <h1>{{ meta.title }}</h1>
+  <p class="meta"><strong>Reporting period:</strong> {{ meta.report_period_label }}</p>
+  <p class="meta"><strong>Prepared by:</strong> {{ meta.prepared_by }}{% if meta.prepared_role %} · {{ meta.prepared_role }}{% endif %}</p>
+  <p class="meta">{{ kpis.total_projects }} projects · {% if kpis.available %}{{ kpis.total }} tracked tasks · {{ kpis.projects_with_tasks }} projects with task records{% else %}Weekly tasks not available{% endif %}</p>
+</header>
+
+<section id="executive-summary">
+  <h2>Executive summary</h2>
+  {% for paragraph in summary %}<p>{{ paragraph }}</p>{% endfor %}
+</section>
+
+<section id="portfolio">
+  <h2>Portfolio snapshot</h2>
+  <div class="kpis">
+    <div class="kpi"><strong>{{ kpis.total_projects }}</strong><span>Total projects</span></div>
+    <div class="kpi"><strong>{{ kpis.total if kpis.available else '—' }}</strong><span>Total tracked tasks</span></div>
+    <div class="kpi"><strong>{{ kpis.done if kpis.available else '—' }}</strong><span>Done</span></div>
+    <div class="kpi"><strong>{{ '%.1f'|format(kpis.completion_rate) ~ '%' if kpis.available else '—' }}</strong><span>Weekly completion rate</span></div>
+    <div class="kpi"><strong>{{ kpis.in_progress if kpis.available else '—' }}</strong><span>In progress</span></div>
+    <div class="kpi"><strong>{{ kpis.in_review if kpis.available else '—' }}</strong><span>In review</span></div>
+    <div class="kpi"><strong>{{ kpis.hold_todo if kpis.available else '—' }}</strong><span>On hold / to do</span></div>
+    <div class="kpi risk"><strong>{{ kpis.overdue if kpis.available else '—' }}</strong><span>Overdue flags</span></div>
+  </div>
+  <p class="scope" style="margin-top:12px">Open / active = In Progress + In Review + On Hold + To Do. Overdue is an overlapping flag. {% if kpis.unknown %}Unknown status: {{ kpis.unknown }} task(s), excluded from the open-status sum.{% endif %}</p>
+  {% if kpis.stale %}<p class="note warning-note">Includes {{ kpis.stale }} carried-forward task record(s). The displayed counts describe the supplied workbook; current status needs confirmation.</p>{% endif %}
+  {% if not meta.task_detail_available %}<p class="note">Weekly figures, where available, use explicit Executive Summary counts. Task detail and team workload are unavailable.</p>{% endif %}
+</section>
+
+<section id="task-health">
+  <h2>Task health</h2>
+  {% if kpis.available %}
+  <div class="chart-grid">
+    <div class="chart-box">
+      <h3>Weekly completion by project</h3>
+      {% if show_charts %}<div class="canvas-wrap" style="height:{{ chart_height }}px"><canvas id="weekly-chart" role="img" aria-label="Weekly completion percentage by project. Values are in the project ledger."></canvas></div>{% endif %}
+      <p class="scope">Done ÷ tasks in the weekly source. Projects without tasks are excluded. All values also appear in the project ledger.</p>
+      <table class="chart-table {% if show_charts %}print-only{% endif %}"><thead><tr><th>Project</th><th class="number">Weekly completion</th></tr></thead><tbody>{% for p in weekly_chart_rows %}<tr><td>{{ p.name }}</td><td class="number">{{ '%.1f'|format(p.completion_rate) }}%<div class="meter"><span style="width:{{ p.completion_rate }}%"></span></div></td></tr>{% else %}<tr><td colspan="2">No task data</td></tr>{% endfor %}</tbody></table>
+    </div>
+    <div class="chart-box">
+      <h3>Task status mix</h3>
+      {% if show_charts %}<div class="canvas-wrap"><canvas id="status-chart" role="img" aria-label="Task status distribution. Exact counts are in the table below."></canvas></div>{% endif %}
+      <table class="chart-table"><thead><tr><th>Status</th><th class="number">Tasks</th></tr></thead><tbody>{% for row in status_rows %}<tr><td>{{ row.name }}</td><td class="number">{{ row.count }}</td></tr>{% endfor %}</tbody></table>
+      <p class="scope">{{ kpis.active }} open tasks. Overdue flags are shown separately and are not added to this status mix.</p>
+    </div>
+  </div>
+  {% else %}<p class="no-data">No weekly task counts available.</p>{% endif %}
+</section>
+
+<section id="team">
+  <h2>Team workload</h2>
+  {% if team %}
+  <div class="table-wrap"><table class="team-table"><thead><tr><th>Team member</th><th class="number">Total</th><th class="number">Done</th><th class="number">In progress</th><th class="number">In review</th><th class="number">Hold / To do</th><th class="number">Open</th><th class="number">Overdue</th><th class="number">Unknown</th><th class="number">Completion</th></tr></thead><tbody>
+  {% for p in team %}<tr><td>{{ p.name }}</td><td class="number">{{ p.total }}</td><td class="number">{{ p.done }}</td><td class="number">{{ p.in_progress }}</td><td class="number">{{ p.in_review }}</td><td class="number">{{ p.hold_todo }}</td><td class="number">{{ p.active }}</td><td class="number">{{ p.overdue }}</td><td class="number">{{ p.unknown }}</td><td class="number">{{ '%.1f'|format(p.completion_rate) }}%</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% for paragraph in team_insights %}<p>{{ paragraph }}</p>{% endfor %}
+  {% else %}<p class="no-data">No task-level assignee data available.</p>{% endif %}
+</section>
+
+<section id="projects">
+  <h2>Project-by-project ledger</h2>
+  <p class="scope">Overall completion comes from the Executive Summary. Weekly completion is calculated from this week's task source. These percentages are separate measures.</p>
+  <div class="table-wrap"><table><thead><tr><th>Project</th><th class="number">Overall</th><th class="number">Tasks</th><th class="number">Done</th><th class="number">Weekly %</th><th class="number">Overdue</th><th>Status</th></tr></thead><tbody>
+  {% for p in projects %}<tr><td class="project-name">{{ p.name }}{% if p.newly_onboarded %}<br><small>Newly onboarded</small>{% endif %}{% if p.end_date %}<br><small>End: {{ p.end_date|date_label }}</small>{% endif %}</td><td class="number">{{ p.overall_completion|number ~ '%' if p.overall_completion is not none else '—' }}</td><td class="number">{{ p.total if p.available else '—' }}</td><td class="number">{{ p.done if p.available else '—' }}</td><td class="number">{{ '%.1f'|format(p.completion_rate) ~ '%' if p.available and p.total else '—' }}</td><td class="number">{{ p.overdue if p.available else '—' }}</td><td>{{ p.status }}</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section id="task-log">
+  <h2>Full task log</h2>
+  <p class="scope">Expand a project to see all supplied weekly tasks. Print / Save as PDF expands every task section automatically.</p>
+  {% for p in projects if p.tasks %}
+  <details class="tasks"><summary>{{ p.name }} <span>{{ p.done }}/{{ p.total }} completed{% if p.stale %} · carried forward{% endif %}</span></summary>
+    <p class="scope">{{ p.commentary }}</p>
+    <div class="table-wrap"><table class="task-table"><thead><tr><th>Task ID</th><th>Task title</th><th>Status</th><th>Priority</th><th>Assignee</th><th>Created / Due</th><th>Notes / Flag</th></tr></thead><tbody>
+    {% for t in p.tasks %}<tr><td>{{ t.task_id or '—' }}</td><td>{{ t.title }}</td><td><span class="badge {{ t.status|status_class }}">{{ t.status }}</span>{% if t.status == 'Unknown' %}<br><small>{{ t.raw_status or 'Blank status' }}</small>{% endif %}</td><td>{{ t.priority or '—' }}</td><td>{{ t.assignee }}</td><td>{{ t.created_date|date_label }}{% if t.due_date %}<br><small>Due {{ t.due_date|date_label }}</small>{% endif %}</td><td>{% if t.overdue %}<span class="badge overdue">Overdue{% if t.stale %} · carried forward{% endif %}</span> {% endif %}{{ t.notes or '—' }}</td></tr>{% endfor %}
+    </tbody></table></div>
+  </details>
+  {% else %}<p class="no-data">No task-level records available.</p>{% endfor %}
+</section>
+
+{% if spotlight %}
+<section id="spotlight">
+  <h2>Major project spotlight · {{ spotlight.project.name }}</h2>
+  {% for paragraph in spotlight.summary %}<p>{{ paragraph }}</p>{% endfor %}
+  {% set r = spotlight.register %}
+  {% if r %}
+  <div class="table-wrap"><table><thead><tr><th>Register status</th><th class="number">Tasks</th><th class="number">Estimated hours</th><th class="number">Share of hours</th></tr></thead><tbody>
+    <tr><td>Completed</td><td class="number">{{ r.completed_tasks }}</td><td class="number">{{ r.completed_hours|number if r.hours_available else '—' }}</td><td class="number">{{ '%.1f'|format(r.completed_hours_pct) ~ '%' if r.hours_available else '—' }}</td></tr>
+    <tr><td>Active / Started / In review</td><td class="number">{{ r.active_tasks }}</td><td class="number">{{ r.active_hours|number if r.hours_available else '—' }}</td><td class="number">{{ '%.1f'|format(r.active_hours_pct) ~ '%' if r.hours_available else '—' }}</td></tr>
+    <tr><td>Not started</td><td class="number">{{ r.not_started_tasks }}</td><td class="number">{{ r.not_started_hours|number if r.hours_available else '—' }}</td><td class="number">{{ '%.1f'|format(r.not_started_hours_pct) ~ '%' if r.hours_available else '—' }}</td></tr>
+    {% if r.held_tasks %}<tr><td>On hold</td><td class="number">{{ r.held_tasks }}</td><td class="number">{{ r.held_hours|number if r.hours_available else '—' }}</td><td class="number">{{ '%.1f'|format(r.held_hours_pct) ~ '%' if r.hours_available else '—' }}</td></tr>{% endif %}
+    {% if r.unknown_tasks %}<tr><td>Unknown status</td><td class="number">{{ r.unknown_tasks }}</td><td class="number">{{ r.unknown_hours|number if r.hours_available else '—' }}</td><td class="number">{{ '%.1f'|format(r.unknown_hours_pct) ~ '%' if r.hours_available else '—' }}</td></tr>{% endif %}
+    <tr><th>Total</th><th class="number">{{ r.total_tasks }}</th><th class="number">{{ r.total_hours|number if r.hours_available else '—' }}</th><th></th></tr>
+  </tbody></table></div>
+  {% if r.hours_available %}<p class="scope">Uncompleted estimated hours: {{ r.remaining_hours|number }} ({{ '%.1f'|format(r.remaining_hours_pct) }}%), including active, not-started, held and unknown-status work. {% if r.missing_hours %}{{ r.missing_hours }} task(s) lack usable estimates; hour shares cover the supplied estimates only.{% endif %}</p>{% endif %}
+  {% if r.sprints %}
+  <h3>Sprint status</h3>
+  <p class="scope">Source sprint labels and ranges are preserved. A range is one group; its hours are not duplicated across individual sprints. Mixed / Open means the group contains unfinished or mixed-status work.</p>
+  <div class="sprint-strip">{% for s in r.sprints %}<div class="sprint"><strong>{{ s.name }}</strong>{{ s.state }}<br><small>{{ s.completed_tasks }}/{{ s.total_tasks }} completed</small></div>{% endfor %}</div>
+  {% endif %}
+  <h3>Phase progress</h3>
+  <div class="table-wrap"><table><thead><tr><th>Phase</th><th class="number">Tasks</th><th class="number">Done</th><th class="number">Hours</th><th class="number">Done hours</th><th class="number">Active hours</th><th class="number">Not started hours</th><th class="number">Other hours</th><th class="number">Done hours %</th></tr></thead><tbody>
+  {% for p in r.phases %}<tr><td>{{ p.name }}</td><td class="number">{{ p.total_tasks }}</td><td class="number">{{ p.completed_tasks }}</td><td class="number">{{ p.total_hours|number if p.hours_available else '—' }}</td><td class="number">{{ p.completed_hours|number if p.hours_available else '—' }}</td><td class="number">{{ p.active_hours|number if p.hours_available else '—' }}</td><td class="number">{{ p.not_started_hours|number if p.hours_available else '—' }}</td><td class="number">{{ p.other_hours|number if p.hours_available else '—' }}</td><td class="number">{{ '%.1f'|format(p.completed_hours_pct) ~ '%' if p.hours_available else '—' }}</td></tr>{% endfor %}
+  </tbody></table></div>
+  <details><summary>Detailed register <span>{{ r.total_tasks }} long-term tasks</span></summary><div class="table-wrap"><table><thead><tr><th>ID / Phase</th><th>Task / Deliverable</th><th>Sprint</th><th>Assigned to</th><th>Status</th><th class="number">Est. hours</th></tr></thead><tbody>{% for t in r.tasks %}<tr><td>{{ t.task_id or '—' }}<br><small>{{ t.phase }}</small></td><td>{{ t.title }}</td><td>{{ t.sprint or '—' }}</td><td>{{ t.assignee }}</td><td>{{ t.status }}{% if t.status == 'Unknown' %} ({{ t.raw_status or 'blank' }}){% endif %}</td><td class="number">{{ t.hours|number }}</td></tr>{% endfor %}</tbody></table></div></details>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if sales %}
+<section id="sales">
+  <h2>Sales / lead opportunities</h2>
+  <p class="scope">Agreements are grouped by invoice number with client and installment distinctions preserved. Calculated line totals and stated subtotals are shown separately when available. Lead aging uses the report end date.</p>
+  <div class="table-wrap"><table><thead><tr><th>Client / Opportunity</th><th>Value</th><th>Status / Aging</th><th>Next action</th></tr></thead><tbody>
+  {% for s in sales %}<tr><td><strong>{{ s.client }}</strong><br>{{ s.opportunity }}{% if s.invoice_id %}<br><small>{{ s.invoice_id }}</small>{% endif %}{% if s.related_projects %}<br><small>Projects: {{ s.related_projects|join(', ') }}</small>{% endif %}</td><td>{{ s.value|money }}{% if s.kind == 'Agreement' %}<br><small>Calculated line items</small>{% endif %}{% if s.stated_value %}<br>Stated: {{ s.stated_value|money }}{% endif %}{% if s.reconciliation %}<br><span class="badge medium">Line totals used; source differs</span>{% endif %}</td><td>{{ s.stage or 'Not available' }}{% if s.proposal_date %}<br><small>Proposal: {{ s.proposal_date|date_label }}</small>{% endif %}{% if s.days_waiting is not none %}<br>{{ s.days_waiting }} days · {{ s.aging }}{% endif %}<br><small>Advance: {{ s.advance_status or 'Not available' }}</small></td><td>{{ s.next_action or 'Not available' }}{% if s.delivery_started %}<br><small>Related project records already show delivery activity.</small>{% endif %}</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endif %}
+
+{% if finance %}
+<section id="finance">
+  <h2>Invoicing & collections</h2>
+  {% if finance.stale %}<p class="note warning-note">Finance source is carried forward. These are recalculations of the recorded lines, not confirmation of current receipts.</p>{% endif %}
+  <div class="group-totals">{% for group in finance.categories if group.count or group.name != 'Unclassified' %}<div class="group-total"><h3>{{ group.name }}</h3>{% if group.totals %}{% for currency,amount in group.totals.items() %}<strong>{{ currency }} {{ amount|number }}</strong>{% endfor %}{% else %}<span class="muted">No records</span>{% endif %}<small>{{ group.count }} line item(s)</small></div>{% endfor %}</div>
+  {% for paragraph in finance_insights %}<p style="margin-top:12px">{{ paragraph }}</p>{% endfor %}
+  <p class="scope">Paid status overrides source bucket. Pending advances and balances due on completion retain their contractual classification. For other unpaid lines, Due Soon means due at the cutoff or within {{ due_soon_days }} days after it; due dates before the cutoff or an explicit Collections status are overdue. Source dates are retained, and disagreements are flagged.</p>
+  <h3>Source bucket reconciliation</h3>
+  <p class="scope">Source bucket totals below sum the individual workbook lines. Remaining unpaid totals keep the original bucket membership; the cards above reclassify by current recorded status and report date.</p>
+  <div class="table-wrap"><table><thead><tr><th>Workbook section</th><th>All source lines</th><th>Remaining unpaid lines</th><th class="number">Paid lines</th></tr></thead><tbody>{% for r in finance.reconciliation %}<tr><td>{{ r.label }}</td><td>{{ r.line_total|money }}</td><td>{{ r.unpaid_total|money if r.unpaid_total else 'No unpaid records' }}</td><td class="number">{{ r.paid_count }}</td></tr>{% endfor %}</tbody></table></div>
+  {% if finance.controls %}<h3>Workbook subtotal checks</h3><div class="table-wrap"><table><thead><tr><th>Source subtotal</th><th>Stated subtotal</th><th>Calculated lines</th><th>Amount cited in note</th><th>Result</th></tr></thead><tbody>{% for r in finance.controls %}<tr><td>{{ r.label }}<br><small>{{ r.source }}</small></td><td>{{ r.stated|money }}</td><td>{{ r.calculated|money }}</td><td>{{ r.note_amounts|money }}</td><td>{{ 'Line totals used; source differs' if r.mismatch else 'Reconciled' }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+  <details><summary>Invoice line items <span>{{ finance.rows|length }} records</span></summary><div class="table-wrap"><table><thead><tr><th>Client / Invoice</th><th>Amount</th><th>Due date</th><th>Recorded status</th><th>Calculated category</th></tr></thead><tbody>{% for r in finance.rows %}<tr><td>{{ r.record.client }}<br><small>{{ r.record.invoice_id or 'No invoice number' }} · {{ r.record.installment }}</small></td><td>{{ r.amount_label }}</td><td>{{ r.record.due_date|date_label }}</td><td>{{ r.record.status or 'Not available' }}</td><td>{{ r.category }}{% if r.record.conditional_balance %}<br><small>Conditional on completion</small>{% endif %}</td></tr>{% endfor %}</tbody></table></div></details>
+</section>
+{% endif %}
+
+<section id="risks">
+  <h2>Risks & actions</h2>
+  <div class="risk-list">{% for risk in risks %}<article class="risk-item"><div class="risk-label"><span class="badge {{ risk.severity|lower }}">{{ risk.severity }}</span>{{ risk.area }} · {{ risk.category }}</div><h3>{{ risk.title }}</h3><p>{{ risk.explanation }}</p><p><strong>Recommended action:</strong> {{ risk.action }}</p></article>{% else %}<p class="no-data">No risks triggered by the available data and configured rules.</p>{% endfor %}</div>
+</section>
+
+<section id="management-actions">
+  <h2>Management actions</h2>
+  <div class="table-wrap"><table><thead><tr><th>Priority</th><th>Project / Area</th><th>Action required</th></tr></thead><tbody>{% for action in actions %}<tr><td><span class="badge {{ action.priority|lower }}">{{ action.priority }}</span></td><td>{{ action.area }}</td><td>{{ action.action }}</td></tr>{% else %}<tr><td colspan="3">No management actions triggered.</td></tr>{% endfor %}</tbody></table></div>
+</section>
+
+<section id="data-quality">
+  <h2>Data handling & source notes</h2>
+  <ul class="quality-list">{% for note in handling_notes %}<li>{{ note }}</li>{% endfor %}</ul>
+  <p class="scope">Source: {{ meta.source_file }}. Counts include all supplied weekly task records, including explicitly carried-forward items and closures assigned to this reporting cycle by the workbook. Created dates are not used to filter tasks. Register tasks are a separate long-term population. Missing dates are not invented. No historical trend or “best week” claim is inferred from a single workbook.</p>
+  <p class="scope">Rule-based commentary uses the calculated figures. Duplicate task IDs count once, preferring the latest update, then the most complete row, then the last row. Source notes remain visible as supplied. Unknown statuses remain separate.</p>
+</section>
+<footer>{{ meta.company }} · Internal weekly status report · {{ meta.report_period_label }}</footer>
+</main>
+{% if show_charts %}<script>{{ chart_js|safe }}</script><script type="application/json" id="chart-data">{{ charts|tojson }}</script>{% endif %}
+<script>{{ report_js|safe }}</script>
+</body>
+</html>
