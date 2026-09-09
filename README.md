@@ -208,3 +208,8 @@ output/                        Generated reports
 
 The source uses [openpyxl's workbook loader](https://openpyxl.readthedocs.io/en/stable/_modules/openpyxl/reader/excel.html), [Flask's upload and download APIs](https://flask.palletsprojects.com/en/stable/patterns/fileuploads/), and Jinja2 autoescaping. [Chart.js 4.5.1](https://github.com/chartjs/Chart.js/releases/tag/v4.5.1) is bundled under its MIT license in `static/vendor/Chart.js-LICENSE.md`; it is embedded into each generated report.
 
+
+## Vercel hosting
+
+Import this repository into Vercel using the Flask framework preset. No build command or output directory is needed. The hosted app accepts workbooks up to 4 MB, returns self-contained HTML directly to the browser, and deletes temporary workbook files after processing. Reports are not retained on the server; download before leaving the page. The local app continues to support 20 MB workbooks. Hosted reports larger than 4 MB require the local generator. Updates to the connected main branch redeploy automatically.
+

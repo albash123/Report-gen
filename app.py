@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import secrets
+import os
 import tempfile
 import threading
 import webbrowser
@@ -179,6 +180,11 @@ def create_app(test_config=None):
         )
 
     return app
+
+
+if os.environ.get("VERCEL"):
+    from cloud import create_cloud_app
+    app = create_cloud_app()
 
 
 if __name__ == "__main__":
